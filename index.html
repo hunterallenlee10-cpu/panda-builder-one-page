@@ -116,9 +116,21 @@ section{padding:64px 0}
 /* result */
 .res .where{text-align:center;color:var(--muted);font-size:15px;margin:-2px 0 14px}
 .pkgs{display:grid;gap:10px}
-.pk{border:2px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center}
-.pk.feat{border-color:var(--orange);background:var(--orange-soft);position:relative}
-.pk.feat::before{content:"Most chosen";position:absolute;top:-10px;right:12px;background:var(--orange);color:var(--asphalt);font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:2px 9px;border-radius:999px}
+.pk{width:100%;font:inherit;color:inherit;text-align:left;background:#fff;cursor:pointer;transition:border-color .15s,background .15s;border:2px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center}
+.pk{position:relative}
+.pk[aria-pressed="true"]{border-color:var(--orange);background:var(--orange-soft);box-shadow:0 0 0 1px var(--orange)}
+.pk[aria-pressed="true"] .n::after{content:" ✓";color:var(--orange-deep)}
+.pkpick{margin:4px 0 2px}
+.pkpick .lbl{display:block;font-size:13px;font-weight:800;margin:14px 0 6px}
+.pkpick .opts3{display:grid;gap:8px}
+.pkpick input{position:absolute;opacity:0}
+.pkpick label{display:flex;justify-content:space-between;align-items:center;gap:10px;border:2px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer;font-weight:800;font-size:15px;line-height:1.25}
+.pkpick label span:last-child{font-weight:700;font-size:13.5px;color:var(--muted);white-space:nowrap;text-align:right}
+.pkpick input:checked+label{border-color:var(--orange);background:var(--orange-soft)}
+.pkpick input:checked+label span:first-child::before{content:"● ";color:var(--orange)}
+.pkpick input:not(:checked)+label span:first-child::before{content:"○ ";color:#9aa3a9}
+.pkpick input:focus-visible+label{outline:3px solid var(--orange);outline-offset:2px}
+.pk.feat::before{content:"Most chosen";z-index:1;position:absolute;top:-10px;right:12px;background:var(--orange);color:var(--asphalt);font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:2px 9px;border-radius:999px}
 .pk .n{font-weight:850;font-stretch:112%}
 .pk .t{font-size:13px;color:var(--muted);grid-column:1}
 .pk .p{grid-row:1/3;grid-column:2;text-align:right;font-weight:900;font-stretch:112%;font-size:19px;white-space:nowrap}
@@ -521,7 +533,9 @@ var QUESTIONS=[
   {key:"when",q:"When would you like your new roof?",opts:[["asap","⚡","As soon as possible"],["1-3","🗓️","In 1 to 3 months"],["later","🧭","Later this year"],["price","💲","Just want a price"]]}
 ];
 var SIZE_ICONS={small:"🏡",medium:"🏠",large:"🏘️",xl:"🏰"};
-var A={},cur=0,sent=false;
+var A={pkg:"golden"},cur=0,sent=false;
+function pkgById(id){for(var i=0;i<PACKAGES.length;i++)if(PACKAGES[i].id===id)return PACKAGES[i];return null}
+function syncPkg(){document.querySelectorAll(".pk[data-pkg]").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.pkg===A.pkg?"true":"false")});document.querySelectorAll("input[name=pkg]").forEach(function(i){i.checked=i.value===A.pkg})}
 
 /* ad links can skip straight to a size, e.g. ?size=medium (matches "Tap your roof size" ad buttons) */
 (function(){var m=/[?&]size=(small|medium|large|xl)\b/.exec(location.search);if(m)A.size=m[1]})();
@@ -565,11 +579,12 @@ function renderResult(body){
     wrap.appendChild(el("p","where",SIZES[A.size].label+" ("+SIZES[A.size].desc+") · complete GAF roof, tear-off to cleanup"));
     var list=el("div","pkgs");
     PACKAGES.forEach(function(p){
-      var r=range(p,A.size),c=el("div","pk"+(p.feat?" feat":""));
+      var r=range(p,A.size),c=el("button","pk"+(p.feat?" feat":""));c.type="button";c.dataset.pkg=p.id;c.setAttribute("aria-pressed",A.pkg===p.id?"true":"false");c.onclick=function(){A.pkg=p.id;syncPkg()};
       c.appendChild(el("div","n",p.name));c.appendChild(el("div","t",p.tag));
       var pr=el("div","p",rangeText(r));pr.appendChild(el("small",null,"estimated range"));c.appendChild(pr);list.appendChild(c);
     });
     wrap.appendChild(list);
+    wrap.appendChild(el("p","fine","Tap a package to choose it. You can change your mind at your free inspection."));
     if(hasOffer)wrap.appendChild(el("p","save","🎉 Your "+money(CONFIG.offer.amount)+" "+CONFIG.offer.label+" savings comes off these prices."));
     wrap.appendChild(el("p","fine","Ranges are wide until we measure. Your exact price is confirmed in writing at your free inspection or video walkthrough."));
   }else{
@@ -598,6 +613,18 @@ function leadForm(){
     w.appendChild(l);w.appendChild(i);fs.appendChild(w);
   });
   f.appendChild(fs);
+  if(A.type==="shingle"||A.type==="unsure"){
+    var pk=el("div","pkpick");pk.setAttribute("role","radiogroup");pk.setAttribute("aria-labelledby","pk-lbl");
+    var lb=el("span","lbl","Your package");lb.id="pk-lbl";pk.appendChild(lb);
+    var o3=el("div","opts3");
+    PACKAGES.concat([{id:"help",name:"Help me choose"}]).forEach(function(p){
+      var id="pk-"+p.id,i=document.createElement("input");i.type="radio";i.name="pkg";i.id=id;i.value=p.id;i.checked=A.pkg===p.id;
+      i.onchange=function(){A.pkg=p.id;syncPkg()};
+      var l=el("label");l.htmlFor=id;l.appendChild(el("span",null,p.name));l.appendChild(el("span",null,p.perSq?rangeText(range(p,A.size)):"We'll walk you through it"));
+      o3.appendChild(i);o3.appendChild(l);
+    });
+    pk.appendChild(o3);f.appendChild(pk);
+  }
   var err=el("p","err");err.setAttribute("role","alert");f.appendChild(err);
   var b=el("button","btn",null);b.type="submit";b.innerHTML='Book my free price check <span class="arr" aria-hidden="true">›</span>';f.appendChild(b);
   f.appendChild(el("p","consent","By tapping the button you agree Panda Exteriors may call or text you about your roof at the number you entered, including by automated means. Consent isn't required to buy. Message and data rates may apply. Reply STOP to opt out."));
@@ -607,6 +634,7 @@ function leadForm(){
     var msg=!v("name")?"Enter your name.":v("phone").replace(/\D/g,"").length<10?"Enter a 10-digit phone number.":!/^\d{5}$/.test(v("zip"))?"Enter your 5-digit ZIP code.":v("email")&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v("email"))?"Check your email address.":"";
     err.textContent=msg;if(msg)return;
     var lead={name:v("name"),phone:v("phone"),email:v("email"),zip:v("zip"),confirm:f.elements.how.value,answers:A,
+      package:(A.type==="shingle"||A.type==="unsure")?(pkgById(A.pkg)?{name:pkgById(A.pkg).name,range:range(pkgById(A.pkg),A.size)}:"Help me choose"):null,
       priceRanges:(A.type==="shingle"||A.type==="unsure")?PACKAGES.map(function(p){return {package:p.name,range:range(p,A.size)}}):null,
       offer:hasOffer?CONFIG.offer.label+" "+money(CONFIG.offer.amount)+" off":null,page:location.href,submittedAt:new Date().toISOString()};
     b.disabled=true;b.textContent="Sending…";
@@ -624,6 +652,7 @@ function renderDone(wrap){
   var L=A._lead,d=el("div","done");
   d.appendChild(el("div","big","🐼"));
   var h=el("h3",null,"You're all set, "+L.name.split(" ")[0]+"!");h.tabIndex=-1;h.id="rh";d.appendChild(h);
+  if(L.package&&L.package.name)d.appendChild(el("p",null,"Your pick: "+L.package.name+", "+rangeText(L.package.range)+"."));
   d.appendChild(el("p",null,(L.confirm==="video"?"A Panda roofing specialist will text you to set up your video walkthrough.":"A Panda roofing specialist will call to set up your free inspection.")+" Can't wait? Call us now."));
   if(CONFIG.demo&&!CONFIG.leadEndpoint)d.appendChild(el("p","fine","Demo: nothing was sent. In the live version this goes straight to Panda's CRM."));
   var a=el("a","btn dark","📞 Call "+CONFIG.phone);a.href=telHref;d.appendChild(a);
